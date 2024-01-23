@@ -5,7 +5,13 @@ const bodyParser = require('body-parser');
 const router = require('./router');
 const FilesDao = require('./dao/files.dao');
 const mongoConnect = require('./db')
+
+// Importo las rutas que has creado
+const cartsRouter = require('./router/cartRoutes');
+const chatRoutes = require('./router/chatRoutes');
 const productRoutes = require('./router/productRoutes');
+
+
 const app = express();
 
 mongoConnect();
@@ -23,6 +29,11 @@ app.engine('handlebars', handlebars.engine({
 app.set('views', process.cwd() + '/src/views');
 
 router(app);
+
+app.use('/', cartsRouter);
+app.use('/', chatRoutes);
+app.use('/', productRoutes);
+
 
 app.get('/', (req, res) => {
   // Redirige a la ruta '/inicio'

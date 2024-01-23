@@ -1,4 +1,4 @@
-const templatesController = require ('../controllers/template.controller');
+const templatesController = require ('../controllers/product.controller');
 
 const router = app => {
     app.use('/', templatesController)

@@ -1,87 +1,123 @@
-const Product = require('../models/products.model');
+const { Router } = require('express')
+const productController = require('./template.controller'); // Asegúrate de tener tu controlador de productos
+const Products = require('../models/products.model');
 
+const router = Router()
 
-exports.getAllProducts = async (options) => {
-    try {
-        const products = await Product.paginate({}, options);
-        //const products = await Product.paginate({}, options).populate('status');
-        console.log("Datos de la base de datos (página actual):", products.docs);
-        return products.docs;
-    } catch (error) {
-        console.error('Error al obtener productos de la base de datos:', error);
-        throw error;
-    }
-};
-
-exports.getCategories = async () => {
-    try {
-        const categories = await Product.distinct('category');
-        return categories;
-    } catch (error) {
-        console.error('Error al obtener categorías:', error);
-        throw error;
-    }
-};
-
-exports.getCategoriesAndCount = async (req, res) => {
-    try {
-        const categoryCounts = await Product.aggregate([
-            {
-                $group: {
-                    _id: '$category',
-                    count: { $sum: 1 }
-                }
-            }
-        ]);
-        return categoryCounts;
-    } catch (error) {
-        console.error('Error al obtener categorías y cantidad de productos por categoría:', error);
-        res.status(500).json({ error: 'Error del servidor al obtener categorías y cantidad de productos por categoría' });
-    }
-};
-
-exports.getProductsByCategory = async (category) => {
+router.get('/', async (req, res) => {
   try {
-    const products = await Product.find({ category: category });
-    return products;
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const sort = req.query.sort === 'desc' ? -1 : 1;
+    const query = req.query.query || {};
+
+    const options = {
+      limit,
+      page,
+      sort: { price: sort }, // Ordenar por precio ascendente o descendente
+    };
+
+    // Realizar la búsqueda en base a la consulta
+    const products = await Products.paginate(query, options);
+
+    res.json(products);
   } catch (error) {
-    console.error(`Error al obtener productos por categoría (${category}):`, error);
-    throw error;
+    console.error('Error al obtener productos:', error);
+    res.status(500).json({ error: 'Error del servidor al obtener productos' });
   }
-};
+});
 
-exports.getProductsByCategoryAndAvailability = async (category, availability, limit, page) => {
-    try {
-        const query = {
-            category,
-        };
+router.get('/api/:category/:availability?/:limit?', async (req, res) => {
+  try {
+    const category = req.params.category;
+    const availability = req.params.availability; // Puede ser undefined si no se proporciona
+    const limit = req.params.limit || 10;
 
-        if (availability !== undefined) {
-            query.status = availability;
-        }
+    const result = await productController.getProductsByCategoryAndAvailability(category, availability, limit);
+    res.json(result);
+  } catch (error) {
+    console.error('Error al procesar la solicitud:', error);
+    res.status(500).json({ status: 'error', error: 'Error del servidor al obtener productos' });
+  }
+});
 
-        const options = {
-            page: page || 1,
-            limit: limit || 10,
-        };
+router.get('/inicio', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
 
-        const result = await Product.paginate(query, options);
+    const options = {
+      page,
+      limit,
+    };
+    const categories = await productController.getCategories();
+    const categoryCounts = await productController.getCategoriesAndCount();
+    const products = await productController.getAllProducts(options);
 
-        return {
-            status: 'success',
-            payload: result.docs,
-            totalPages: result.totalPages,
-            prevPage: result.prevPage,
-            nextPage: result.nextPage,
-            page: result.page,
-            hasPrevPage: result.hasPrevPage,
-            hasNextPage: result.hasNextPage,
-            prevLink: result.prevLink,
-            nextLink: result.nextLink,
-        };
-    } catch (error) {
-        console.error('Error al obtener productos por categoría y disponibilidad:', error);
-        throw error;
+    res.render('inicio.handlebars', { products,categories,categoryCounts,estilo: 'estilos.css'});
+  } catch (error) {
+    console.error('Error al obtener productos de la base de datos:', error);
+    res.status(500).json({ error: 'Error del servidor al obtener productos' });
+  }
+});
+
+router.get('/:category', async (req, res) => {
+  try {
+    const category = req.params.category;
+    const products = await productController.getProductsByCategory(category);
+    const categoryCounts = await productController.getCategoriesAndCount();
+    res.render('categoria.handlebars', { products, category,categoryCounts,estilo: 'estilos.css'});
+  } catch (error) {
+    console.error('Error al obtener productos por categoría:', error);
+    res.status(500).json({ error: 'Error del servidor al obtener productos por categoría' });
+  }
+});
+
+
+router.get('/products', async (req, res) => {
+  try {
+    const products = await Products.find()
+    res.json({ payload: products })
+  } catch (error) {
+    res.json({ error })
+  }
+})
+
+router.post('/products', async (req, res) => {
+  try {
+    const { name, category, description, price, imageUrl } = req.body;
+
+    const newProductInfo = {
+      name,
+      category,
+      description,
+      price,
+      imageUrl,
+    };
+
+    // Crear el producto en MongoDB
+    const newProduct = await Products.create(newProductInfo);
+
+    // Crear índices si no existen
+    const indexDefinitions = [
+      { name: 1, category: 1 },
+      // Agrega aquí otros índices que desees crear
+    ];
+
+    for (const indexDefinition of indexDefinitions) {
+      const indexExists = await Products.collection.indexExists(indexDefinition);
+      if (!indexExists) {
+        await Products.collection.createIndex(indexDefinition);
+      }
     }
-};
 
+    res.json({ payload: newProduct });
+  } catch (error) {
+    console.error('Error al crear producto en MongoDB:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
+
+
+module.exports = router
