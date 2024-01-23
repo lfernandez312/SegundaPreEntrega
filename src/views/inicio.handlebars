@@ -1,0 +1,29 @@
+<section class="product-section">
+  <br>
+  <center>
+    <h2>Productos en descuento</h2>
+  </center>
+  <div class="container">
+    {{#each products}}
+    {{#if discount}}
+    <div class="product-card col-md-4 mb-4">
+      <h2>{{this.name}}</h2>
+      <img src="/images{{this.imageUrl}}" alt="{{this.name}}" class="product-image">
+      <p class="description">{{this.description}}</p>
+      <p class="category">{{this.category}}</p>
+      <p class="price">{{this.price}} $</p>
+      <button class="add-to-cart-btn btn btn-primary" data-product-id="{{this._id}}">Agregar al carrito</button>
+    </div>
+    {{/if}}
+    {{/each}}
+  </div>
+
+  <div class="pagination mt-4">
+    {{#if products.hasNextPage}}
+    <a href="?page={{products.nextPage}}&limit={{products.limit}}" class="btn btn-secondary">Next</a>
+    {{/if}}
+    {{#if products.hasPrevPage}}
+    <a href="?page={{products.prevPage}}&limit={{products.limit}}" class="btn btn-secondary">Previous</a>
+    {{/if}}
+  </div>
+</section>
